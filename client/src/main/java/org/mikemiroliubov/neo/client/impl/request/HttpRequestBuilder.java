@@ -1,0 +1,45 @@
+package org.mikemiroliubov.neo.client.impl.request;
+
+import lombok.Builder;
+import lombok.Value;
+import org.mikemiroliubov.neo.client.response.Response;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * Build HTTP requests in the format of:
+ *
+ * GET /path HTTP/1.1
+ * Host: example.com
+ * Connection: close
+ */
+@Value
+public class HttpRequestBuilder {
+    private final String method;
+    private final String path;
+    private final String host;
+    private final Map<String, String> headers = new LinkedHashMap<>();
+    private final String body;
+    private final CompletableFuture<Response> responseFuture;
+
+    public String buildHttpRequest() {
+        StringBuilder sb = new StringBuilder();
+        sb.append(method).append(" ").append(path).append(" HTTP/1.1\r\n");
+        sb.append("Host: ").append(host).append("\r\n");
+
+        headers.forEach((k, v) -> sb.append(k).append(": ").append(v).append("\r\n"));
+        if (body != null && !body.isEmpty()) {
+            sb.append("Content-Length: ").append(body.length()).append("\r\n");
+        }
+
+        sb.append("\r\n");
+
+        if (body != null) {
+            sb.append(body);
+        }
+
+        return sb.toString();
+    }
+}
