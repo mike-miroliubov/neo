@@ -51,14 +51,14 @@ public class NeoClientImpl implements NeoClient {
             path += "?" + uri.getRawQuery();
         }
 
-        var request = new HttpRequestBuilder("GET", path, uri.getHost(), null, result);
+        var request = new HttpRequestBuilder("GET", path, uri.getHost(), uri.getPort(), null, result);
 
-        try (SocketChannel channel = SocketChannel.open()) {
-            channel.configureBlocking(false);
-            channel.register(selector, SelectionKey.OP_CONNECT | SelectionKey.OP_READ | SelectionKey.OP_WRITE, request);
+        SocketChannel channel = SocketChannel.open();
+        channel.configureBlocking(false);
+        channel.connect(new InetSocketAddress(uri.getHost(), port));
 
-            channel.connect(new InetSocketAddress(uri.getHost(), port));
-        }
+        channel.register(selector, SelectionKey.OP_CONNECT, request);
+        selector.wakeup();
 
         return result;
     }
@@ -85,22 +85,25 @@ public class NeoClientImpl implements NeoClient {
                     Iterator<SelectionKey> iterator = readyKeys.iterator();
                     while (iterator.hasNext()) {
                         SelectionKey key = iterator.next();
+                        iterator.remove();
 
                         HttpRequestBuilder requestBuilder = (HttpRequestBuilder) key.attachment();
                         if (key.isConnectable()) {
                             SocketChannel sc = (SocketChannel) key.channel();
                             if (sc.finishConnect()) {
                                 System.out.println("Connected!");
+                                key.interestOps(SelectionKey.OP_WRITE);
                             }
                         }
                         if (key.isWritable()) {
+                            System.out.println("Ready to write!");
                             CompletableFuture.runAsync(() -> writeChannel((SocketChannel) key.channel(), requestBuilder));
+                            key.interestOps(SelectionKey.OP_READ);
                         }
                         if (key.isReadable()) {
+                            System.out.println("Ready to read!");
                             CompletableFuture.runAsync(() -> readChannel((SocketChannel) key.channel(), requestBuilder.getResponseFuture()));
                         }
-
-                        iterator.remove();
                     }
                 } catch (IOException e) {
                     throw new RuntimeException(e); // TODO: log this properly
@@ -111,7 +114,7 @@ public class NeoClientImpl implements NeoClient {
 
     private static void readChannel(SocketChannel channel, CompletableFuture<Response> future) {
         var buf = ByteBuffer.allocate(1024);
-        try {
+        try (channel) {
             channel.read(buf);
             buf.flip();
 

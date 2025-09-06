@@ -20,6 +20,7 @@ public class HttpRequestBuilder {
     private final String method;
     private final String path;
     private final String host;
+    private final int port;
     private final Map<String, String> headers = new LinkedHashMap<>();
     private final String body;
     private final CompletableFuture<Response> responseFuture;
@@ -27,7 +28,11 @@ public class HttpRequestBuilder {
     public String buildHttpRequest() {
         StringBuilder sb = new StringBuilder();
         sb.append(method).append(" ").append(path).append(" HTTP/1.1\r\n");
-        sb.append("Host: ").append(host).append("\r\n");
+        sb.append("Host: ").append(host);
+        if (port != -1) {
+            sb.append(":").append(port);
+        }
+        sb.append("\r\n");
 
         headers.forEach((k, v) -> sb.append(k).append(": ").append(v).append("\r\n"));
         if (body != null && !body.isEmpty()) {
