@@ -102,7 +102,9 @@ public class NeoClientImpl implements NeoClient {
                         }
                         if (key.isReadable()) {
                             System.out.println("Ready to read!");
-                            CompletableFuture.runAsync(() -> readChannel((SocketChannel) key.channel(), requestBuilder.getResponseFuture()));
+                            key.interestOps(0); // temporarily remove interest
+                            CompletableFuture.runAsync(() -> readChannel(key, requestBuilder));
+                            //readChannel(key, requestBuilder);
                         }
                     }
                 } catch (IOException e) {
@@ -112,16 +114,25 @@ public class NeoClientImpl implements NeoClient {
         }
     }
 
-    private static void readChannel(SocketChannel channel, CompletableFuture<Response> future) {
+    private void readChannel(SelectionKey key, HttpRequestBuilder request) {
+        SocketChannel channel = (SocketChannel) key.channel();
         var buf = ByteBuffer.allocate(1024);
-        try (channel) {
-            channel.read(buf);
-            buf.flip();
+        try {
+            int read = channel.read(buf);
+            System.out.println("Read " + read + " bytes");
+            if (read > 0) {
+                buf.flip();
+                request.getResponseData().writeBytes(buf.array());
 
-            // TODO: smart reading to account for variable length
-            future.complete(new Response(new ResponseBody(buf.array())));
+                key.interestOps(SelectionKey.OP_READ);
+                selector.wakeup();
+            }
+            if (read == -1) {
+                channel.close();
+                request.getResponseFuture().complete(new Response(new ResponseBody(request.getResponseData().toByteArray())));
+            }
         } catch (IOException e) {
-            future.completeExceptionally(e);
+            request.getResponseFuture().completeExceptionally(e);
         }
     }
 

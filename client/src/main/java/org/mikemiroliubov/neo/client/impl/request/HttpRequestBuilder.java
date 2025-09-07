@@ -1,9 +1,9 @@
 package org.mikemiroliubov.neo.client.impl.request;
 
-import lombok.Builder;
 import lombok.Value;
 import org.mikemiroliubov.neo.client.response.Response;
 
+import java.io.ByteArrayOutputStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -24,6 +24,7 @@ public class HttpRequestBuilder {
     private final Map<String, String> headers = new LinkedHashMap<>();
     private final String body;
     private final CompletableFuture<Response> responseFuture;
+    private final ByteArrayOutputStream responseData = new ByteArrayOutputStream();
 
     public String buildHttpRequest() {
         StringBuilder sb = new StringBuilder();
@@ -33,6 +34,7 @@ public class HttpRequestBuilder {
             sb.append(":").append(port);
         }
         sb.append("\r\n");
+        sb.append("Connection: close\r\n");
 
         headers.forEach((k, v) -> sb.append(k).append(": ").append(v).append("\r\n"));
         if (body != null && !body.isEmpty()) {
