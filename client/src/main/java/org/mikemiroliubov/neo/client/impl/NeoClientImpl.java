@@ -14,10 +14,14 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 public class NeoClientImpl implements NeoClient {
+    public static final String HTTP_HEADER_TERMINATOR = "\r\n\r\n";
+    public static final String CONTENT_LENGTH_HEADER = "content-length";
     private final Selector selector;
     private final Thread dispatcherThread;
 
@@ -104,7 +108,6 @@ public class NeoClientImpl implements NeoClient {
                             System.out.println("Ready to read!");
                             key.interestOps(0); // temporarily remove interest
                             CompletableFuture.runAsync(() -> readChannel(key, requestBuilder));
-                            //readChannel(key, requestBuilder);
                         }
                     }
                 } catch (IOException e) {
@@ -124,6 +127,16 @@ public class NeoClientImpl implements NeoClient {
                 buf.flip();
                 request.getResponseData().writeBytes(buf.array());
 
+                if (!request.isResponseHeadersParsed()) {
+                    parseResponseHeaders(request);
+                }
+                if (request.isResponseHeadersParsed()) {
+                    if (request.getResponseData().size() >= request.getTotalResponseLength()) {
+                        channel.close();
+                        request.getResponseFuture().complete(new Response(new ResponseBody(request.getResponseData().toByteArray())));
+                    }
+                }
+
                 key.interestOps(SelectionKey.OP_READ);
                 selector.wakeup();
             }
@@ -133,6 +146,32 @@ public class NeoClientImpl implements NeoClient {
             }
         } catch (IOException e) {
             request.getResponseFuture().completeExceptionally(e);
+        }
+    }
+
+    private void parseResponseHeaders(HttpRequestBuilder request) {
+        var currentData = request.getResponseData().toString();
+        int headerEndIndex = currentData.indexOf(HTTP_HEADER_TERMINATOR);
+        if (headerEndIndex == -1) {
+            return;
+        }
+
+        var headersStr = currentData.substring(0, headerEndIndex);
+        var headerLines = headersStr.split("\r\n");
+        var headers = Arrays.stream(headerLines)
+                .map(l -> l.split(":"))
+                .collect(Collectors.toMap(
+                        it -> it[0].trim().toLowerCase(),
+                        it -> it.length > 1 ? it[1].trim() : ""));
+
+        request.setResponseHeaders(headers);
+        request.setResponseHeadersParsed(true);
+
+        if (headers.containsKey(CONTENT_LENGTH_HEADER)) {
+            int bodyLength = Integer.parseInt(headers.get(CONTENT_LENGTH_HEADER));
+            int totalLength = headersStr.getBytes().length + HTTP_HEADER_TERMINATOR.getBytes().length + bodyLength;
+            request.setTotalResponseLength(totalLength);
+            request.setExpectedBodyLength(bodyLength);
         }
     }
 

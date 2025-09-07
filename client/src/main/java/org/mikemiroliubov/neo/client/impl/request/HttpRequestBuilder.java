@@ -1,9 +1,11 @@
 package org.mikemiroliubov.neo.client.impl.request;
 
+import lombok.Data;
 import lombok.Value;
 import org.mikemiroliubov.neo.client.response.Response;
 
 import java.io.ByteArrayOutputStream;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -15,16 +17,21 @@ import java.util.concurrent.CompletableFuture;
  * Host: example.com
  * Connection: close
  */
-@Value
+@Data
 public class HttpRequestBuilder {
     private final String method;
     private final String path;
     private final String host;
     private final int port;
-    private final Map<String, String> headers = new LinkedHashMap<>();
+    private final Map<String, String> requestHeaders = new LinkedHashMap<>();
     private final String body;
+
     private final CompletableFuture<Response> responseFuture;
     private final ByteArrayOutputStream responseData = new ByteArrayOutputStream();
+    private boolean responseHeadersParsed = false;
+    private Map<String, String> responseHeaders = new HashMap<>();
+    private int expectedBodyLength = -1;
+    private int totalResponseLength = -1;
 
     public String buildHttpRequest() {
         StringBuilder sb = new StringBuilder();
@@ -34,9 +41,9 @@ public class HttpRequestBuilder {
             sb.append(":").append(port);
         }
         sb.append("\r\n");
-        sb.append("Connection: close\r\n");
+        //sb.append("Connection: close\r\n");
 
-        headers.forEach((k, v) -> sb.append(k).append(": ").append(v).append("\r\n"));
+        requestHeaders.forEach((k, v) -> sb.append(k).append(": ").append(v).append("\r\n"));
         if (body != null && !body.isEmpty()) {
             sb.append("Content-Length: ").append(body.length()).append("\r\n");
         }
