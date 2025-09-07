@@ -10,6 +10,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -17,9 +18,12 @@ import java.util.concurrent.CompletableFuture;
 /**
  * A helper class that stores everything we need to send an HTTP request and parse a response
  * <p>
+ *
+ * <pre>
  * GET /path HTTP/1.1
  * Host: example.com
  * Connection: close
+ * </pre>
  */
 @Data
 public class HttpContext {
@@ -77,9 +81,14 @@ public class HttpContext {
     }
 
     public void complete() {
+        byte[] bodyData = Arrays.copyOfRange(
+                responseData.toByteArray(),
+                totalResponseLength - expectedBodyLength,
+                responseData.size());
+
         responseFuture.complete(
                 new Response(
-                        new ResponseBody(responseData.toByteArray()),
+                        new ResponseBody(bodyData),
                         responseHeaders,
                         200,
                         statusReason
@@ -94,7 +103,6 @@ public class HttpContext {
             sb.append(":").append(port);
         }
         sb.append("\r\n");
-        //sb.append("Connection: close\r\n");
 
         requestHeaders.forEach((k, v) -> sb.append(k).append(": ").append(v).append("\r\n"));
         if (body != null && !body.isEmpty()) {

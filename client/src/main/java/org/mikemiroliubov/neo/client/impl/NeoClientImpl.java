@@ -20,6 +20,7 @@ public class NeoClientImpl implements NeoClient {
     private static final String HTTP_HEADER_TERMINATOR = "\r\n\r\n";
     private static final String CONTENT_LENGTH_HEADER = "content-length";
     private static final String PROTOCOL_HEADER = "HTTP/1.1";
+    
     private final Selector selector;
     private final Thread dispatcherThread;
 
