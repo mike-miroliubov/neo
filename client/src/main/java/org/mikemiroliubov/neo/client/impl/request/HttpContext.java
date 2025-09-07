@@ -1,30 +1,34 @@
 package org.mikemiroliubov.neo.client.impl.request;
 
 import lombok.Data;
-import lombok.Value;
+import lombok.RequiredArgsConstructor;
+import org.mikemiroliubov.neo.client.request.HttpMethod;
 import org.mikemiroliubov.neo.client.response.Response;
 
 import java.io.ByteArrayOutputStream;
+import java.net.InetSocketAddress;
+import java.net.URI;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Build HTTP requests in the format of:
+ * A helper class that stores everything we need to send an HTTP request and parse a response
  *
  * GET /path HTTP/1.1
  * Host: example.com
  * Connection: close
  */
 @Data
-public class HttpRequestBuilder {
-    private final String method;
+public class HttpContext {
+    private final HttpMethod method;
     private final String path;
     private final String host;
     private final int port;
     private final Map<String, String> requestHeaders = new LinkedHashMap<>();
     private final String body;
+    private final InetSocketAddress socketAddress;
 
     private final CompletableFuture<Response> responseFuture;
     private final ByteArrayOutputStream responseData = new ByteArrayOutputStream();
@@ -33,9 +37,36 @@ public class HttpRequestBuilder {
     private int expectedBodyLength = -1;
     private int totalResponseLength = -1;
 
+    public HttpContext(HttpMethod method, String url, CompletableFuture<Response> result) {
+        var uri = URI.create(url);
+
+        int port = uri.getPort();
+        if (port == -1) {
+            // Default based on scheme
+            port = uri.getScheme().equalsIgnoreCase("https") ? 443 : 80;
+        }
+
+        String path = uri.getRawPath();
+        if (path == null || path.isEmpty()) {
+            path = "";
+        }
+        if (uri.getRawQuery() != null) {
+            path += "?" + uri.getRawQuery();
+        }
+
+        this.port = uri.getPort();
+        this.method = method;
+        this.host = uri.getHost();
+        this.body = null;
+        this.path = path;
+        this.responseFuture = result;
+
+        this.socketAddress = new InetSocketAddress(uri.getHost(), port);
+    }
+
     public String buildHttpRequest() {
         StringBuilder sb = new StringBuilder();
-        sb.append(method).append(" ").append(path).append(" HTTP/1.1\r\n");
+        sb.append(method.name()).append(" ").append(path).append(" HTTP/1.1\r\n");
         sb.append("Host: ").append(host);
         if (port != -1) {
             sb.append(":").append(port);
