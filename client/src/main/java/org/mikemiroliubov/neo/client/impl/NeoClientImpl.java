@@ -11,9 +11,9 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
@@ -32,16 +32,24 @@ public class NeoClientImpl implements NeoClient {
     @Override
     public CompletableFuture<Response> request(HttpMethod method, String url) throws IOException {
         var result = new CompletableFuture<Response>();
-        var context = new HttpContext(method, url, result);
+        scheduleRequest(new HttpContext(method, url, result));
+        return result;
+    }
 
+    @Override
+    public CompletableFuture<Response> request(HttpMethod method, String url, Map<String, String> headers, String body) throws IOException {
+        var result = new CompletableFuture<Response>();
+        scheduleRequest(new HttpContext(method, url, body, headers, result));
+        return result;
+    }
+
+    private void scheduleRequest(HttpContext context) throws IOException {
         SocketChannel channel = SocketChannel.open();
         channel.configureBlocking(false);
         channel.connect(context.getSocketAddress());
 
         channel.register(selector, SelectionKey.OP_CONNECT, context);
         selector.wakeup();
-
-        return result;
     }
 
     @Override
@@ -76,8 +84,8 @@ public class NeoClientImpl implements NeoClient {
                     }
                     if (key.isWritable()) {
                         System.out.println("Ready to write!");
-                        CompletableFuture.runAsync(() -> writeChannel((SocketChannel) key.channel(), context));
-                        key.interestOps(SelectionKey.OP_READ);
+                        key.interestOps(0); // temporarily remove interest
+                        CompletableFuture.runAsync(() -> writeChannel(key, context));
                     }
                     if (key.isReadable()) {
                         System.out.println("Ready to read!");
@@ -122,15 +130,19 @@ public class NeoClientImpl implements NeoClient {
                 request.getResponseFuture().complete(new Response(new ResponseBody(request.getResponseData().toByteArray())));
             }
         } catch (IOException e) {
-            try {
-                if (channel.isOpen()) {
-                    channel.close();
-                }
-            } catch (IOException ex) {
-                ex.printStackTrace(); // TODO: proper logging
-            }
+            tryCloseChannel(channel);
 
             request.getResponseFuture().completeExceptionally(e);
+        }
+    }
+
+    private static void tryCloseChannel(SocketChannel channel) {
+        try {
+            if (channel.isOpen()) {
+                channel.close();
+            }
+        } catch (IOException ex) {
+            ex.printStackTrace(); // TODO: proper logging
         }
     }
 
@@ -160,11 +172,22 @@ public class NeoClientImpl implements NeoClient {
         }
     }
 
-    private static void writeChannel(SocketChannel channel, HttpContext requestBuilder) {
+    private void writeChannel(SelectionKey key, HttpContext context) {
+        var channel = (SocketChannel) key.channel();
         try {
-            channel.write(StandardCharsets.UTF_8.encode(requestBuilder.buildHttpRequest()));
+            channel.write(context.getRequestBody());
+
+            if (context.getRequestBody().hasRemaining()) {
+                // still has smth to write
+                key.interestOps(SelectionKey.OP_WRITE);
+            } else {
+                // we wrote everything, can switch to reading now
+                key.interestOps(SelectionKey.OP_READ);
+            }
+            selector.wakeup();
         } catch (IOException e) {
-            requestBuilder.getResponseFuture().completeExceptionally(e);
+            tryCloseChannel(channel);
+            context.getResponseFuture().completeExceptionally(e);
         }
     }
 }

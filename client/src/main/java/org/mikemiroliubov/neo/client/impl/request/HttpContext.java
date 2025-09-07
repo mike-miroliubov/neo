@@ -8,6 +8,9 @@ import org.mikemiroliubov.neo.client.response.Response;
 import java.io.ByteArrayOutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -22,14 +25,17 @@ import java.util.concurrent.CompletableFuture;
  */
 @Data
 public class HttpContext {
+    // request data
     private final HttpMethod method;
     private final String path;
     private final String host;
     private final int port;
-    private final Map<String, String> requestHeaders = new LinkedHashMap<>();
+    private final Map<String, String> requestHeaders;
     private final String body;
     private final InetSocketAddress socketAddress;
+    private final ByteBuffer requestBody;
 
+    // response data
     private final CompletableFuture<Response> responseFuture;
     private final ByteArrayOutputStream responseData = new ByteArrayOutputStream();
     private boolean responseHeadersParsed = false;
@@ -38,6 +44,10 @@ public class HttpContext {
     private int totalResponseLength = -1;
 
     public HttpContext(HttpMethod method, String url, CompletableFuture<Response> result) {
+        this(method, url, null, null, result);
+    }
+
+    public HttpContext(HttpMethod method, String url, String body, Map<String, String> headers, CompletableFuture<Response> result) {
         var uri = URI.create(url);
 
         int port = uri.getPort();
@@ -57,14 +67,16 @@ public class HttpContext {
         this.port = uri.getPort();
         this.method = method;
         this.host = uri.getHost();
-        this.body = null;
+        this.body = body;
         this.path = path;
         this.responseFuture = result;
+        requestHeaders = headers != null ? headers : Map.of();
 
         this.socketAddress = new InetSocketAddress(uri.getHost(), port);
+        requestBody = StandardCharsets.UTF_8.encode(buildHttpRequest());
     }
 
-    public String buildHttpRequest() {
+    private String buildHttpRequest() {
         StringBuilder sb = new StringBuilder();
         sb.append(method.name()).append(" ").append(path).append(" HTTP/1.1\r\n");
         sb.append("Host: ").append(host);
