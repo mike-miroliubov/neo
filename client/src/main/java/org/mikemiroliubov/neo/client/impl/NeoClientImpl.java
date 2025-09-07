@@ -4,7 +4,6 @@ import org.mikemiroliubov.neo.client.NeoClient;
 import org.mikemiroliubov.neo.client.impl.request.HttpContext;
 import org.mikemiroliubov.neo.client.request.HttpMethod;
 import org.mikemiroliubov.neo.client.response.Response;
-import org.mikemiroliubov.neo.client.response.ResponseBody;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -18,8 +17,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 public class NeoClientImpl implements NeoClient {
-    public static final String HTTP_HEADER_TERMINATOR = "\r\n\r\n";
-    public static final String CONTENT_LENGTH_HEADER = "content-length";
+    private static final String HTTP_HEADER_TERMINATOR = "\r\n\r\n";
+    private static final String CONTENT_LENGTH_HEADER = "content-length";
+    private static final String PROTOCOL_HEADER = "HTTP/1.1";
     private final Selector selector;
     private final Thread dispatcherThread;
 
@@ -99,7 +99,7 @@ public class NeoClientImpl implements NeoClient {
         }
     }
 
-    private void readChannel(SelectionKey key, HttpContext request) {
+    private void readChannel(SelectionKey key, HttpContext context) {
         SocketChannel channel = (SocketChannel) key.channel();
         var buf = ByteBuffer.allocate(1024);
 
@@ -109,15 +109,15 @@ public class NeoClientImpl implements NeoClient {
 
             if (read > 0) {
                 buf.flip();
-                request.getResponseData().writeBytes(buf.array());
+                context.getResponseData().writeBytes(buf.array());
 
-                if (!request.isResponseHeadersParsed()) {
-                    parseResponseHeaders(request);
+                if (!context.isResponseHeadersParsed()) {
+                    parseResponseHeaders(context);
                 }
-                if (request.isResponseHeadersParsed()) {
-                    if (request.getResponseData().size() >= request.getTotalResponseLength()) {
+                if (context.isResponseHeadersParsed()) {
+                    if (context.getResponseData().size() >= context.getTotalResponseLength()) {
                         channel.close();
-                        request.getResponseFuture().complete(new Response(new ResponseBody(request.getResponseData().toByteArray())));
+                        context.complete();
                     }
                 }
 
@@ -127,12 +127,12 @@ public class NeoClientImpl implements NeoClient {
 
             if (read == -1) {
                 channel.close();
-                request.getResponseFuture().complete(new Response(new ResponseBody(request.getResponseData().toByteArray())));
+                context.complete();
             }
         } catch (IOException e) {
             tryCloseChannel(channel);
 
-            request.getResponseFuture().completeExceptionally(e);
+            context.getResponseFuture().completeExceptionally(e);
         }
     }
 
@@ -146,8 +146,8 @@ public class NeoClientImpl implements NeoClient {
         }
     }
 
-    private void parseResponseHeaders(HttpContext request) {
-        var currentData = request.getResponseData().toString();
+    private void parseResponseHeaders(HttpContext context) {
+        var currentData = context.getResponseData().toString();
         int headerEndIndex = currentData.indexOf(HTTP_HEADER_TERMINATOR);
         if (headerEndIndex == -1) {
             return;
@@ -161,14 +161,19 @@ public class NeoClientImpl implements NeoClient {
                         it -> it[0].trim().toLowerCase(),
                         it -> it.length > 1 ? it[1].trim() : ""));
 
-        request.setResponseHeaders(headers);
-        request.setResponseHeadersParsed(true);
+        context.setResponseHeaders(headers);
+        context.setResponseHeadersParsed(true);
+
+        var codeAndReason = headerLines[0].substring(PROTOCOL_HEADER.length() + 1).split(" ");
+        context.setStatusCode(Integer.parseInt(codeAndReason[0]));
+        context.setStatusReason(codeAndReason[1]);
+
 
         if (headers.containsKey(CONTENT_LENGTH_HEADER)) {
             int bodyLength = Integer.parseInt(headers.get(CONTENT_LENGTH_HEADER));
             int totalLength = headersStr.getBytes().length + HTTP_HEADER_TERMINATOR.getBytes().length + bodyLength;
-            request.setTotalResponseLength(totalLength);
-            request.setExpectedBodyLength(bodyLength);
+            context.setTotalResponseLength(totalLength);
+            context.setExpectedBodyLength(bodyLength);
         }
     }
 

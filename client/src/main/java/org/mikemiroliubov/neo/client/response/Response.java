@@ -1,8 +1,6 @@
 package org.mikemiroliubov.neo.client.response;
 
-import lombok.Value;
+import java.util.Map;
 
-@Value
-public class Response {
-    private final ResponseBody body;
+public record Response(ResponseBody body, Map<String, String> headers, int statusCode, String reason) {
 }

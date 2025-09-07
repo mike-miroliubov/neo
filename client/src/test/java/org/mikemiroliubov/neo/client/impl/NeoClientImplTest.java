@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 class NeoClientImplTest {
 
     //public static final String URL = "http://localhost:8080/api/chats";
@@ -18,7 +20,9 @@ class NeoClientImplTest {
         try (var client = new NeoClientImpl()) {
             var responseFuture = client.request(HttpMethod.GET, GET_URL);
             var response = responseFuture.get();
-            System.out.println(new String(response.getBody().getData()));
+            System.out.println(new String(response.body().getData()));
+            assertThat(response.statusCode()).isEqualTo(200);
+            assertThat(response.reason()).isEqualTo("OK");
         }
     }
 
@@ -35,7 +39,7 @@ class NeoClientImplTest {
                     """;
 
             var postResponse = client.request(HttpMethod.POST, POST_URL, Map.of("content-type", "application/json"), requestBody);
-            System.out.println(new String(postResponse.get().getBody().getData()));
+            System.out.println(new String(postResponse.get().body().getData()));
         }
     }
 }

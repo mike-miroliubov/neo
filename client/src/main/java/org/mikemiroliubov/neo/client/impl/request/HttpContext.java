@@ -1,24 +1,22 @@
 package org.mikemiroliubov.neo.client.impl.request;
 
 import lombok.Data;
-import lombok.RequiredArgsConstructor;
 import org.mikemiroliubov.neo.client.request.HttpMethod;
 import org.mikemiroliubov.neo.client.response.Response;
+import org.mikemiroliubov.neo.client.response.ResponseBody;
 
 import java.io.ByteArrayOutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
  * A helper class that stores everything we need to send an HTTP request and parse a response
- *
+ * <p>
  * GET /path HTTP/1.1
  * Host: example.com
  * Connection: close
@@ -38,8 +36,10 @@ public class HttpContext {
     // response data
     private final CompletableFuture<Response> responseFuture;
     private final ByteArrayOutputStream responseData = new ByteArrayOutputStream();
-    private boolean responseHeadersParsed = false;
     private Map<String, String> responseHeaders = new HashMap<>();
+    private int statusCode = -1;
+    private String statusReason;
+    private boolean responseHeadersParsed = false;
     private int expectedBodyLength = -1;
     private int totalResponseLength = -1;
 
@@ -74,6 +74,16 @@ public class HttpContext {
 
         this.socketAddress = new InetSocketAddress(uri.getHost(), port);
         requestBody = StandardCharsets.UTF_8.encode(buildHttpRequest());
+    }
+
+    public void complete() {
+        responseFuture.complete(
+                new Response(
+                        new ResponseBody(responseData.toByteArray()),
+                        responseHeaders,
+                        200,
+                        statusReason
+                ));
     }
 
     private String buildHttpRequest() {
