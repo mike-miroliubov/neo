@@ -1,0 +1,98 @@
+{
+  "id": 12345,
+  "name": "Example User",
+  "email": "example.user@example.com",
+  "isActive": true,
+  "roles": [
+    "admin",
+    "editor",
+    "viewer"
+  ],
+  "profile": {
+    "age": 29,
+    "gender": "female",
+    "address": {
+      "street": "123 Main St",
+      "city": "Metropolis",
+      "state": "NY",
+      "zip": "12345",
+      "coordinates": {
+        "latitude": 40.7128,
+        "longitude": -74.0060
+      }
+    },
+    "phones": [
+      {
+        "type": "mobile",
+        "number": "+1-202-555-0198"
+      },
+      {
+        "type": "home",
+        "number": "+1-202-555-0147"
+      }
+    ]
+  },
+  "preferences": {
+    "notifications": {
+      "email": true,
+      "sms": false,
+      "push": true
+    },
+    "theme": "dark",
+    "language": "en-US",
+    "timezone": "America/New_York"
+  },
+  "recentActivities": [
+    {
+      "timestamp": "2025-09-06T12:34:56Z",
+      "action": "login",
+      "ip": "192.168.1.100",
+      "device": {
+        "os": "Windows",
+        "browser": "Chrome",
+        "version": "139.0.0.0"
+      }
+    },
+    {
+      "timestamp": "2025-09-06T13:14:22Z",
+      "action": "update_profile",
+      "changes": {
+        "field": "address",
+        "oldValue": "456 Old St",
+        "newValue": "123 Main St"
+      }
+    },
+    {
+      "timestamp": "2025-09-06T14:02:10Z",
+      "action": "purchase",
+      "details": {
+        "orderId": "ORD-987654321",
+        "amount": 199.99,
+        "currency": "USD",
+        "items": [
+          {
+            "productId": "P-123",
+            "name": "Wireless Headphones",
+            "quantity": 1,
+            "price": 99.99
+          },
+          {
+            "productId": "P-456",
+            "name": "Portable Charger",
+            "quantity": 2,
+            "price": 50.00
+          }
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "createdAt": "2025-01-15T09:00:00Z",
+    "updatedAt": "2025-09-06T10:30:00Z",
+    "tags": [
+      "premium",
+      "beta-user",
+      "newsletter"
+    ]
+  }
+}

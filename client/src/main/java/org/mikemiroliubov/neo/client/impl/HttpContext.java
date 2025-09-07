@@ -1,4 +1,4 @@
-package org.mikemiroliubov.neo.client.impl.request;
+package org.mikemiroliubov.neo.client.impl;
 
 import lombok.Data;
 import org.mikemiroliubov.neo.client.request.HttpMethod;
@@ -73,10 +73,11 @@ public class HttpContext {
         this.host = uri.getHost();
         this.body = body;
         this.path = path;
-        this.responseFuture = result;
+        socketAddress = new InetSocketAddress(uri.getHost(), port);
+
+        responseFuture = result;
         requestHeaders = headers != null ? headers : Map.of();
 
-        this.socketAddress = new InetSocketAddress(uri.getHost(), port);
         requestBody = StandardCharsets.UTF_8.encode(buildHttpRequest());
     }
 
@@ -106,7 +107,7 @@ public class HttpContext {
 
         requestHeaders.forEach((k, v) -> sb.append(k).append(": ").append(v).append("\r\n"));
         if (body != null && !body.isEmpty()) {
-            sb.append("Content-Length: ").append(body.length()).append("\r\n");
+            sb.append("Content-Length: ").append(body.getBytes(StandardCharsets.UTF_8).length).append("\r\n");
         }
 
         sb.append("\r\n");
